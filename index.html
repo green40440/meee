@@ -1,0 +1,217 @@
+import React, { useEffect, useState, useRef } from "react";
+
+export default function NoMore67() {
+  const [money, setMoney] = useState(() => {
+    const saved = localStorage.getItem("nm67_money");
+    return saved ? Number(saved) : 0;
+  });
+  const [perClick, setPerClick] = useState(() => {
+    const saved = localStorage.getItem("nm67_perClick");
+    return saved ? Number(saved) : 1;
+  });
+  const [cps, setCps] = useState(() => {
+    const saved = localStorage.getItem("nm67_cps");
+    return saved ? Number(saved) : 0;
+  });
+
+  const [upgrades, setUpgrades] = useState(() => {
+    const saved = localStorage.getItem("nm67_upgrades");
+    return saved
+      ? JSON.parse(saved)
+      : {
+          punchBoost: { name: "Punch Strength", count: 0, baseCost: 15, type: "click", value: 1.5 },
+          autoPunch: { name: "Auto-Puncher", count: 0, baseCost: 50, type: "cps", value: 1 },
+          megaPunch: { name: "Mega Punch", count: 0, baseCost: 500, type: "click", value: 10 }
+        };
+  });
+
+  const [particles, setParticles] = useState([]);
+  const idRef = useRef(0);
+
+  useEffect(() => {
+    localStorage.setItem("nm67_money", String(money));
+  }, [money]);
+  useEffect(() => {
+    localStorage.setItem("nm67_perClick", String(perClick));
+  }, [perClick]);
+  useEffect(() => {
+    localStorage.setItem("nm67_cps", String(cps));
+  }, [cps]);
+  useEffect(() => {
+    localStorage.setItem("nm67_upgrades", JSON.stringify(upgrades));
+  }, [upgrades]);
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      if (cps > 0) setMoney((m) => +(m + cps / 10).toFixed(2));
+    }, 100);
+    return () => clearInterval(t);
+  }, [cps]);
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      setParticles((p) => p.filter((pt) => Date.now() - pt.t < 800));
+    }, 100);
+    return () => clearInterval(t);
+  }, []);
+
+  function handlePunch(e) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    spawnParticles(x, y);
+    setMoney((m) => +(m + perClick).toFixed(2));
+    const el = e.currentTarget;
+    el.classList.remove("scale-95");
+    void el.offsetWidth;
+    el.classList.add("scale-95");
+    setTimeout(() => el.classList.remove("scale-95"), 120);
+  }
+
+  function spawnParticles(x, y) {
+    const n = 6;
+    const list = [];
+    for (let i = 0; i < n; i++) {
+      list.push({ id: idRef.current++, x, y, r: Math.random() * 6 + 4, t: Date.now(), vx: (Math.random() - 0.5) * 6, vy: -Math.random() * 6 });
+    }
+    setParticles((p) => p.concat(list));
+  }
+
+  function buyUpgrade(key) {
+    const up = upgrades[key];
+    const cost = getCost(up.baseCost, up.count);
+    if (money >= cost) {
+      setMoney((m) => +(m - cost).toFixed(2));
+      setUpgrades((u) => ({ ...u, [key]: { ...u[key], count: u[key].count + 1 } }));
+      if (up.type === "click") {
+        setPerClick((pc) => +(pc * up.value).toFixed(2));
+      } else if (up.type === "cps") {
+        setCps((c) => +(c + up.value).toFixed(2));
+      }
+    }
+  }
+
+  function getCost(base, count) {
+    return Math.round(base * Math.pow(1.15, count));
+  }
+
+  function resetGame() {
+    if (!confirm("Are you sure you want to reset NO MORE 67?")) return;
+    setMoney(0);
+    setPerClick(1);
+    setCps(0);
+    setUpgrades({
+      punchBoost: { name: "Punch Strength", count: 0, baseCost: 15, type: "click", value: 1.5 },
+      autoPunch: { name: "Auto-Puncher", count: 0, baseCost: 50, type: "cps", value: 1 },
+      megaPunch: { name: "Mega Punch", count: 0, baseCost: 500, type: "click", value: 10 }
+    });
+    localStorage.clear();
+  }
+
+  return (
+    <div className="min-h-screen bg-black p-6 flex items-start justify-center">
+      <div className="max-w-3xl w-full bg-gray-900/80 backdrop-blur-md rounded-2xl shadow-2xl p-6 grid grid-cols-1 md:grid-cols-3 gap-6 text-white">
+        <div className="col-span-1 md:col-span-2 flex flex-col items-center gap-4">
+          <h1 className="text-3xl font-extrabold text-white">NO MORE <span className="text-rose-500">67</span></h1>
+          <p className="text-sm text-gray-300">Punch the 67 picture to get money! Use money to buy upgrades.</p>
+
+          <div className="relative">
+            <div
+              onClick={handlePunch}
+              className="select-none cursor-pointer p-6 rounded-xl shadow-inner shadow-gray-800 transform transition-transform duration-150 bg-gray-700"
+              style={{ width: 280, height: 280 }}
+            >
+              <svg viewBox="0 0 200 200" width="100%" height="100%">
+                <defs>
+                  <radialGradient id="g1" cx="30%" cy="30%">
+                    <stop offset="0%" stopColor="#fff" stopOpacity="0.7" />
+                    <stop offset="100%" stopColor="#444" />
+                  </radialGradient>
+                </defs>
+                <rect rx="18" width="200" height="200" fill="url(#g1)" stroke="#ff7a7a" strokeWidth="6" />
+                <text x="50%" y="55%" fontSize="80" fontWeight="800" textAnchor="middle" fill="#ffbaba" fontFamily="Arial, Helvetica, sans-serif">
+                  67
+                </text>
+              </svg>
+            </div>
+
+            <div className="pointer-events-none absolute inset-0">
+              {particles.map((pt) => {
+                const age = Date.now() - pt.t;
+                const style = {
+                  left: pt.x - pt.r / 2,
+                  top: pt.y - pt.r / 2 + (age / 10) * pt.vy,
+                  transform: `translateY(${age / 8}px)`,
+                  opacity: Math.max(0, 1 - age / 800)
+                };
+                return (
+                  <div key={pt.id} className="absolute" style={style}>
+                    <div className="rounded-full" style={{ width: pt.r, height: pt.r, background: "linear-gradient(45deg,#ff9999,#ff5555)" }} />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="w-full mt-2 flex items-center justify-between">
+            <div>
+              <div className="text-2xl font-bold text-white">${money.toFixed(2)}</div>
+              <div className="text-sm text-gray-400">Per punch: ${perClick.toFixed(2)} • Auto: {cps.toFixed(2)}/s</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="col-span-1 p-4 rounded-xl bg-gray-800">
+          <h2 className="font-semibold text-white">Shop</h2>
+          <div className="mt-3 flex flex-col gap-3">
+            {Object.entries(upgrades).map(([key, up]) => (
+              <div key={key} className="flex items-center justify-between p-3 bg-gray-700 rounded-lg shadow-sm">
+                <div>
+                  <div className="font-medium text-white">{up.name}</div>
+                  <div className="text-xs text-gray-400">Owned: {up.count}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-semibold text-gray-200">${getCost(up.baseCost, up.count)}</div>
+                  <button
+                    disabled={money < getCost(up.baseCost, up.count)}
+                    onClick={() => buyUpgrade(key)}
+                    className={`mt-2 px-2 py-1 rounded-md text-sm ${money >= getCost(up.baseCost, up.count) ? "bg-indigo-600 text-white" : "bg-gray-600 text-gray-400"}`}
+                  >
+                    Buy
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-gray-600">
+            <div className="text-sm text-gray-400">Tips:</div>
+            <ul className="text-xs text-gray-400 mt-2 list-disc list-inside">
+              <li>Punch the 67 picture to earn money.</li>
+              <li>Buy Punch Strength to make each punch worth more.</li>
+              <li>Buy Auto-Punchers to earn money even when you're not clicking.</li>
+            </ul>
+
+            <div className="mt-4 flex gap-2">
+              <button className="px-3 py-1 bg-red-500 text-white rounded" onClick={resetGame}>
+                Reset
+              </button>
+              <button
+                className="px-3 py-1 bg-green-500 text-white rounded"
+                onClick={() => {
+                  const snapshot = JSON.stringify({ money, perClick, cps, upgrades });
+                  navigator.clipboard?.writeText(snapshot);
+                  alert("Saved snapshot to clipboard — you can paste it somewhere to save progress manually.");
+                }}
+              >
+                Save Snapshot
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="fixed bottom-4 left-4 text-xs text-gray-500">NO MORE 67 — Buddy made this for Finley 😄</div>
+    </div>
+  );
+}
